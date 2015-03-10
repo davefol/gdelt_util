@@ -8,4 +8,5 @@ setup(name='gdelt_util',
       author_email='dof5@cornell.edu',
       license='GNU',
       packages=['gdelt_util'],
+      install_requires=['pandas','numpy','scipy','matplotlib','seaborn']
       zip_safe=False)
