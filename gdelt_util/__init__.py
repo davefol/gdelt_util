@@ -18,7 +18,7 @@ def datetimeToTimestamp(date):
 	""" 
 		convert datetime date to pandas timestamp
 	"""
-	return  pd.tslib.Timestamp('%s-%s-%s' % (date.year,date.month,date.year)) 
+	return  pd.tslib.Timestamp('%s-%s-%s' % (date.year,date.month,date.day))
 
 def convertSQLDATE(sqldate):
 	""" 
@@ -117,7 +117,7 @@ def generateFeaturesAndResponses(data,features,response,window):
 
 	return(pred,res)
 
-def generateVW(data,eventcode,predictors,output,labelingfunction=stdLabel,window=14):
+def generateVW(data,eventcode,predictors,output,labelingfunction,window=14):
 	"""
 		Vowpal Wabbit format:
 		response | features
@@ -135,6 +135,13 @@ def generateVW(data,eventcode,predictors,output,labelingfunction=stdLabel,window
 	# day in our data set
 	responses = labelingfunction(freq)
 
+	# print how many rows were labeled as 1
+	count = 0
+	for i in responses.iteritems():
+		if i[1] == 1:
+			count += 1
+	print "Number of Responses labeled as significant: %d" % count
+
 	# We also need the frequency series for each of our predictor event codes
 	freq_pred = []
 	for event in predictors:
@@ -144,11 +151,11 @@ def generateVW(data,eventcode,predictors,output,labelingfunction=stdLabel,window
 
 	# Each row is a day
 	# For each day we look back 'window' days in time
-	for row in respsonses.iterrows():
+	for row in responses.iteritems():
 		# We wrap this in a try in case we get index errors for timestamps that we dont have
 		try:
-			current_day = row[1].index
-			current_response = row[1]['Response']
+			current_day = row[0]
+			current_response = row[1]
 			current_features = []
 			for day in lastnDays(timestampToDatetime(current_day),window):
 				# convert the day to pandas timestamp
@@ -163,21 +170,21 @@ def generateVW(data,eventcode,predictors,output,labelingfunction=stdLabel,window
 			entry = "%d | " % current_response
 			# Now write each of integers in our current_features list
 			for i in enumerate(current_features):
-				entry = entry + '%d:%d' % (i[0]+1,i[1])
+				entry = entry + '%d:%d ' % (i[0]+1,i[1])
 
 			# Finally, write out our line to file
 			with open(output,'a') as f:
 				f.write(entry + '\n')
 
 			# Now write entry to file
-		except:
-			pass
-
+		except KeyError:
+			print "Key Error on day %s" % current_day
+		print "Key Errors are safe to ignore, this error is likely a result of your window covering days that are not in your data"
 	
 
 def stdLabel(data):
 	""" 
-		This function looks at a data frame that contains a date column and a frequency column
+		This function looks at a Series that contains a date index and a frequency column
 		It returns a dataframe with date column and Response column
 		the response value is 1 if the corresponding frequency is higher than 1 standard deviation
 		and -1 if otherwise
@@ -186,13 +193,13 @@ def stdLabel(data):
 	std = float(data.std())
 	responses = []
 
-	for row in data.iterrows():
-		if (row[1][0] > mean + std):
+	for row in data.iteritems():
+		if (row[1] > mean + std):
 			responses.append(1)
 		else:
 			responses.append(-1)
-	responsesDataFrame = pd.DataFrame(index = data.index,data = responses,columns=['Response'])
-	return responsesDataFrame
+	responsesSeries = pd.Series(index = data.index,data = responses)
+	return responsesSeries
 
 def lastnDays(date,n):
 	""" 
