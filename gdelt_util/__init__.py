@@ -112,6 +112,46 @@ def generateFeaturesAndResponses(data,features,response,window):
 
 	return(pred,res)
 
+	def generateVW(data,eventcode,labelingfunction):
+		"""
+			Vowpal Wabbit format:
+			response | features
+			response is either 1 or -1 for classification
+			features are numbered 1 to k with 1 being the first feature from the most recent day
+			and k being the last feature from the most distant day
+		"""
+		# First generate the responses with some rule
+		# Response is some event Code that we are testing for
+
+		# First generate the frequency dataframe for a particular event
+		freq = generateFrequencyEvent(data,eventcode)
+
+		# Now run that dataframe through a labeling function, this returns a label either 1 or -1 for each
+		# day in our data set
+		responses = labelingfunction(freq)
+
+		pass
+
+	def simpleLabelingFunction(data):
+		""" 
+			This function looks at a data frame that contains a date column and a frequency column
+			It returns a dataframe with date column and Response column
+			the response value is 1 if the corresponding frequency is higher than 1 standard deviation
+			and -1 if otherwise
+		"""
+		mean = data.mean()
+		std = data.std()
+		responses = []
+
+		for row in data.iterrows():
+			if (row[1][0] > mean + std):
+				responses.append(1)
+			else:
+				responses.append(-1)
+		responsesDataFrame = pd.DataFrame(index = data.index,data = responses,columns=['Response'])
+		return responsesDataFrame
+
+
 # def plotRawData(csvfile):
 # 	""" Takes a RAW CSV file from GDELT and generates several plots """
 # 	data = pd.read_csv(csvfile,dtype=object)
