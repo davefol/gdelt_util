@@ -14,7 +14,11 @@ def timestampToDatetime(timestamp):
 	"""
 	return dt.date(timestamp.year,timestamp.month,timestamp.day)
 
-
+def datetimeToTimestamp(date):
+	""" 
+		convert datetime date to pandas timestamp
+	"""
+	return  pd.tslib.Timestamp('%s-%s-%s' % (date.year,date.month,date.year)) 
 
 def convertSQLDATE(sqldate):
 	""" 
@@ -68,7 +72,8 @@ def generateFrequencyEvent(dataframe,eventcode):
 
 		# Convert index to timestamp
 		dates_DataFrame.index = pd.to_datetime(dates_DataFrame.index)
-		return dates_DataFrame
+		# Return Series
+		return pd.Series(dates_DataFrame['Frequency'],index=dates_DataFrame.index)
 
 def generateFeaturesAndResponses(data,features,response,window):
 	"""
@@ -112,44 +117,94 @@ def generateFeaturesAndResponses(data,features,response,window):
 
 	return(pred,res)
 
-	def generateVW(data,eventcode,labelingfunction):
-		"""
-			Vowpal Wabbit format:
-			response | features
-			response is either 1 or -1 for classification
-			features are numbered 1 to k with 1 being the first feature from the most recent day
-			and k being the last feature from the most distant day
-		"""
-		# First generate the responses with some rule
-		# Response is some event Code that we are testing for
+def generateVW(data,eventcode,predictors,output,labelingfunction=stdLabel,window=14):
+	"""
+		Vowpal Wabbit format:
+		response | features
+		response is either 1 or -1 for classification
+		features are numbered 1 to k with 1 being the first feature from the most recent day
+		and k being the last feature from the most distant day
+	"""
+	# First generate the responses with some rule
+	# Response is some event Code that we are testing for
 
-		# First generate the frequency dataframe for a particular event
-		freq = generateFrequencyEvent(data,eventcode)
+	# First generate the frequency dataframe for a particular event
+	freq = generateFrequencyEvent(data,eventcode)
 
-		# Now run that dataframe through a labeling function, this returns a label either 1 or -1 for each
-		# day in our data set
-		responses = labelingfunction(freq)
+	# Now run that dataframe through a labeling function, this returns a label either 1 or -1 for each
+	# day in our data set
+	responses = labelingfunction(freq)
 
-		pass
+	# We also need the frequency series for each of our predictor event codes
+	freq_pred = []
+	for event in predictors:
+		# predictors is a list of strings that are eventcodes
+		# Append the frequency series to our list freq_pred
+		freq_pred.append(generateFrequencyEvent(data,event))
 
-	def simpleLabelingFunction(data):
-		""" 
-			This function looks at a data frame that contains a date column and a frequency column
-			It returns a dataframe with date column and Response column
-			the response value is 1 if the corresponding frequency is higher than 1 standard deviation
-			and -1 if otherwise
-		"""
-		mean = data.mean()
-		std = data.std()
-		responses = []
+	# Each row is a day
+	# For each day we look back 'window' days in time
+	for row in respsonses.iterrows():
+		# We wrap this in a try in case we get index errors for timestamps that we dont have
+		try:
+			current_day = row[1].index
+			current_response = row[1]['Response']
+			current_features = []
+			for day in lastnDays(timestampToDatetime(current_day),window):
+				# convert the day to pandas timestamp
+				past_day  = datetimeToTimestamp(day)
+				# For each of our predictor codes, we need to look up the frequency for the past_day
+				for event_series in freq_pred:
+					current_features.append(event_series[past_day])
+			# We now have our current_features list filled with the frequency for our predictors
+			# We can write our vowpal wabbit line now
 
-		for row in data.iterrows():
-			if (row[1][0] > mean + std):
-				responses.append(1)
-			else:
-				responses.append(-1)
-		responsesDataFrame = pd.DataFrame(index = data.index,data = responses,columns=['Response'])
-		return responsesDataFrame
+			# First write the response and pipe( | )
+			entry = "%d | " % current_response
+			# Now write each of integers in our current_features list
+			for i in enumerate(current_features):
+				entry = entry + '%d:%d' % (i[0]+1,i[1])
+
+			# Finally, write out our line to file
+			with open(output,'a') as f:
+				f.write(entry + '\n')
+
+			# Now write entry to file
+		except:
+			pass
+
+	
+
+def stdLabel(data):
+	""" 
+		This function looks at a data frame that contains a date column and a frequency column
+		It returns a dataframe with date column and Response column
+		the response value is 1 if the corresponding frequency is higher than 1 standard deviation
+		and -1 if otherwise
+	"""
+	mean = float(data.mean())
+	std = float(data.std())
+	responses = []
+
+	for row in data.iterrows():
+		if (row[1][0] > mean + std):
+			responses.append(1)
+		else:
+			responses.append(-1)
+	responsesDataFrame = pd.DataFrame(index = data.index,data = responses,columns=['Response'])
+	return responsesDataFrame
+
+def lastnDays(date,n):
+	""" 
+		input datetime date
+		output list of the n previous days
+	""" 
+	previous_days = []
+	for i in range (1,n+1):
+		delta = dt.timedelta(days=i)
+		new = date - delta
+		previous_days.append(new)
+	return previous_days
 
 
 # def plotRawData(csvfile):
