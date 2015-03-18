@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='gdelt_util',
-      version='0.13',
+      version='0.14',
       description='Utilites exploring GDELT data set',
       url='http://github.com/davefol/gdelt_util',
       author='Dave Fol',

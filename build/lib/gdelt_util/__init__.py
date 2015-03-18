@@ -179,7 +179,7 @@ def generateVW(data,eventcode,predictors,output,labelingfunction,window=14):
 			# Now write entry to file
 		except KeyError:
 			print "Key Error on day %s" % current_day
-
+		print "Key Errors are safe to ignore, this error is likely a result of your window covering days that are not in your data"
 	
 
 def stdLabel(data):
@@ -212,6 +212,18 @@ def lastnDays(date,n):
 		new = date - delta
 		previous_days.append(new)
 	return previous_days
+
+def plotEventCodes(data,eventcodes,freq='M'):
+	""" 
+	given a dataframe and a list of eventcodes, this function plots frequency graphs
+	for each of the event codes
+	"""
+	for event in eventcodes:
+		event_series = generateFrequencyEvent(data,event)
+		resampled = event_series.resample(freq) # Resample our data by freq ('M' for monthly)
+		resampled.plot()
+	plt.show()
+
 
 
 # def plotRawData(csvfile):
